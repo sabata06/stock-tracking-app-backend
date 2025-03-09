@@ -9,30 +9,25 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import os
 from pathlib import Path
 from decouple import config
 import dj_database_url
 from datetime import timedelta
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-cotvwu^xhxqqo2pmx)fumo)1*lk=47*9q!5^62-v@&!phenuji'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-cotvwu^xhxqqo2pmx)fumo)1*lk=47*9q!5^62-v@&!phenuji')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['*', '.onrender.com']  # Render alan adını kabul etmek için
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -40,20 +35,25 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Whitenoise ekliyoruz
+    'whitenoise.runserver_nostatic',
 
     # Projeye eklediğimiz uygulamalar:
-    'accounts',  # Özel kullanıcı modeli ve kullanıcı işlemleri için
-    'stores',    # Mağaza yönetimi için
-    "products", # ürünler,
-    'campaigns', #kampanyalar
+    'accounts',
+    'stores',
+    "products",
+    'campaigns',
     'sales',
     'analytics',
-
-    # Eğer DRF'yi kullanacaksak (önümüzdeki adımlarda kullanacağız)
+    
+    # API için
     'rest_framework',
     'drf_yasg',
-        # JWT Blacklist (opsiyonel, token iptal etme gibi senaryolar için)
     'rest_framework_simplejwt.token_blacklist',
+    
+    # CORS ekleyelim
+    'corsheaders',
 ]
 
 REST_FRAMEWORK = {
@@ -79,6 +79,8 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Statik dosyalar için Whitenoise
+    'corsheaders.middleware.CorsMiddleware',       # CORS middleware'i ekliyoruz
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,6 +88,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# CORS Ayarları
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Geliştirme ortamında tüm kaynaklara izin ver
+if not DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        # Frontend uygulamanızın URL'si
+        "https://yourfrontend.onrender.com",
+    ]
+
 
 ROOT_URLCONF = 'stockTrackingApp.urls'
 
@@ -125,6 +136,11 @@ DATABASES = {
         ssl_require=True
     )
 }
+
+# Statik dosya ayarları
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # Password validation
