@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Sale, SaleItem
+from stores.models import StoreInventory
 
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
@@ -7,17 +8,21 @@ class SaleAdmin(admin.ModelAdmin):
     list_filter = ('store', 'payment_type', 'created_at')
     search_fields = ('store__name', 'sales_rep__email')
 
-@admin.register(SaleItem)
-class SaleItemAdmin(admin.ModelAdmin):
-    list_display = ('sale', 'product_variant', 'quantity', 'unit_price', 'charged_quantity', 'campaign')
-    list_filter = ('campaign', 'product_variant')
-    search_fields = ('sale__id', 'product_variant__product__name')
-
-    def save_model(self, request, obj, form, change):
-        # Eğer unit_price alanı boşsa, otomatik olarak ilgili ürün varyantının fiyatını kullan
-        if obj.unit_price is None:
-            obj.unit_price = obj.product_variant.price
-        # Eğer charged_quantity değeri 0 ise, kampanya uygulanmadığı varsayılarak quantity ile eşleştir
-        if obj.charged_quantity == 0:
-            obj.charged_quantity = obj.quantity
-        super().save_model(request, obj, form, change)
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        sale = form.instance
+        # Her bir satış kalemi için stokları güncelleyelim:
+        for item in sale.items.all():
+            try:
+                inventory = StoreInventory.objects.get(
+                    store=sale.store,
+                    product_variant=item.product_variant
+                )
+                if inventory.quantity >= item.quantity:
+                    inventory.quantity -= item.quantity
+                    inventory.save()
+                else:
+                    # Yetersiz stok durumunda hata verebilir veya loglayabilirsiniz
+                    self.message_user(request, f"Not enough stock for {item.product_variant}", level='error')
+            except StoreInventory.DoesNotExist:
+                self.message_user(request, f"Inventory record not found for {item.product_variant} in store {sale.store}", level='error')
